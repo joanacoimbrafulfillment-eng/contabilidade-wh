@@ -28,7 +28,7 @@
 
         .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; align-items: flex-end; }
         label { display: block; font-size: 0.65em; font-weight: bold; margin-bottom: 5px; color: #666; text-transform: uppercase; }
-        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; box-sizing: border-box; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 13px; box-sizing: border-box; }
         
         .btn { padding: 10px 15px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; }
         .btn-add { background: var(--success); }
@@ -61,7 +61,6 @@
     </nav>
 
     <div class="container">
-        <!-- GLOBAL BALANCES -->
         <div class="top-summary">
             <div class="card" style="border-left-color: var(--cgd)"><h3>WH MAIN CGD</h3><span id="cgd-balance" class="val">0.00 €</span></div>
             <div class="card" style="border-left-color: var(--capital)"><h3>CAPITAL FUND WH</h3><span id="cap-balance" class="val">0.00 €</span></div>
@@ -265,12 +264,24 @@
         const fM = document.getElementById('hist-f-month').value;
         const fP = document.getElementById('hist-f-place').value;
         hBody.innerHTML = ""; rBody.innerHTML = "";
+        
         let cgd = parseFloat(document.getElementById('init-cgd').value) || 0;
         let cap = parseFloat(document.getElementById('init-cap').value) || 0;
 
-        transactions.forEach((m, idx) => {
+        // 1. Cálculo de saldos (sempre pela ordem de inserção - ts)
+        transactions.forEach((m) => {
             if(m.bank === "WH MAIN CGD") cgd += (m.type === "Income" ? m.total : -m.total);
             else cap += (m.type === "Income" ? m.total : -m.total);
+        });
+
+        // 2. ORDENAÇÃO POR DATA PARA O HISTÓRICO (Cronológica inversa: mais recente no topo)
+        const sortedTransactions = [...transactions].sort((a, b) => {
+            if (a.date < b.date) return 1;
+            if (a.date > b.date) return -1;
+            return b.ts - a.ts; // Desempate pela hora de inserção
+        });
+
+        sortedTransactions.forEach((m) => {
             if((fY === "All" || m.year === fY) && (fM === "All" || m.month === fM) && (fP === "All" || m.place === fP)) {
                 hBody.innerHTML += `<tr>
                     <td class="editable" contenteditable="true" onblur="updateField('${m.id}', 'year', this.innerText)">${m.year}</td>
@@ -282,20 +293,22 @@
                     <td align="right" class="${m.type==='Income'?'income-text':'expense-text'}">${m.total.toFixed(2)}€</td>
                     <td><button class="btn-del" onclick="deleteEntry('${m.id}')">Del</button></td></tr>`;
             }
-            if(idx < 5) rBody.innerHTML += `<tr><td>${m.date}</td><td>${m.place}</td><td>${m.bank}</td><td>${m.type}</td><td align="right" class="${m.type==='Income'?'income-text':'expense-text'}">${m.total.toFixed(2)}€</td></tr>`;
         });
+
+        // 3. RECENT ACTIVITY (Mostra os 5 últimos registados - ordem ts)
+        transactions.slice(0, 5).forEach((m) => {
+            rBody.innerHTML += `<tr><td>${m.date}</td><td>${m.place}</td><td>${m.bank}</td><td>${m.type}</td><td align="right" class="${m.type==='Income'?'income-text':'expense-text'}">${m.total.toFixed(2)}€</td></tr>`;
+        });
+
         document.getElementById('cgd-balance').innerText = cgd.toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
         document.getElementById('cap-balance').innerText = cap.toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
         document.getElementById('grand-total').innerText = (cgd + cap).toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
         refreshDashboard();
     }
 
-    // --- SMART UPDATE FIELD ---
     window.updateField = async (id, field, val) => {
         val = val.trim();
         let updateObj = { [field]: val };
-
-        // Se a data for editada, recalcular Ano e Mês automaticamente
         if(field === 'date') {
             const parts = val.split('-');
             if(parts.length === 3) {
@@ -311,7 +324,9 @@
     document.getElementById('btn-export-excel').onclick = () => {
         const headers = ["Year", "Month", "Date", "Entity", "Bank", "Type", "Net", "VAT", "Total"];
         let csv = headers.join(";") + "\n";
-        transactions.forEach(m => { csv += [m.year, m.month, m.date, `"${m.place}"`, m.bank, m.type, m.net.toString().replace(".", ","), m.vat.toString().replace(".", ","), m.total.toString().replace(".", ",")].join(";") + "\n"; });
+        // Exportar ordenado por data
+        const exportSorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+        exportSorted.forEach(m => { csv += [m.year, m.month, m.date, `"${m.place}"`, m.bank, m.type, m.net.toString().replace(".", ","), m.vat.toString().replace(".", ","), m.total.toString().replace(".", ",")].join(";") + "\n"; });
         const link = document.createElement("a");
         link.setAttribute("href", URL.createObjectURL(new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' })));
         link.setAttribute("download", `Finance_Report.csv`);
