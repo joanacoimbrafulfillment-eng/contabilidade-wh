@@ -37,21 +37,22 @@
         .table-container { background: white; border-radius: 8px; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
         th { background: #f8f9fa; padding: 10px; text-align: left; font-size: 0.65em; color: #999; text-transform: uppercase; }
-        td { padding: 8px 10px; border-bottom: 1px solid #f1f1f1; font-size: 0.8em; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f1f1f1; font-size: 0.85em; }
         
+        .editable { cursor: pointer; transition: 0.2s; }
+        .editable:hover { background-color: #fff9db; }
         .income-text { color: var(--success); font-weight: bold; }
         .expense-text { color: var(--danger); font-weight: bold; }
 
-        /* Compact Entity List */
-        .entity-tag-list { max-height: 180px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-right: 5px; }
-        .entity-item { display: flex; justify-content: space-between; align-items: center; background: #fdfdfd; padding: 4px 8px; border: 1px solid #eee; border-radius: 4px; font-size: 0.75em; }
+        .entity-tag-list { max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; border: 1px solid #eee; padding: 5px; border-radius: 5px; }
+        .entity-item { display: flex; justify-content: space-between; align-items: center; background: #fdfdfd; padding: 4px 8px; border-bottom: 1px solid #eee; font-size: 0.75em; }
 
         #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:9999; display:flex; justify-content:center; align-items:center; }
     </style>
 </head>
 <body>
 
-    <div id="loader"><h2>Connecting to WH Cloud...</h2></div>
+    <div id="loader"><h2>Syncing WH Cloud...</h2></div>
 
     <nav class="nav-tabs">
         <button class="tab-btn active" data-tab="tab-entry">Entry & Balances</button>
@@ -64,14 +65,11 @@
         <div class="top-summary">
             <div class="card" style="border-left-color: var(--cgd)"><h3>WH MAIN CGD</h3><span id="cgd-balance" class="val">0.00 €</span></div>
             <div class="card" style="border-left-color: var(--capital)"><h3>CAPITAL FUND WH</h3><span id="cap-balance" class="val">0.00 €</span></div>
-            <div class="card" style="background: var(--primary); color: white;"><h3 style="color: #bdc3c7">TOTAL CONSOLIDATED</h3><span id="grand-total" class="val">0.00 €</span></div>
+            <div class="card" style="background: var(--primary); color: white;"><h3 style="color: #bdc3c7">CONSOLIDATED TOTAL</h3><span id="grand-total" class="val">0.00 €</span></div>
         </div>
 
-        <!-- TAB 1: ENTRY & BALANCES -->
         <div id="tab-entry" class="tab-content active">
             <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 20px; align-items: start;">
-                
-                <!-- LEFT COLUMN: MAIN ACTIONS -->
                 <div>
                     <div class="box">
                         <h4>Opening Balances</h4>
@@ -85,8 +83,6 @@
                     <div class="box">
                         <h4>New Transaction</h4>
                         <div class="form-grid">
-                            <div><label>Year</label><select id="sel-year"></select></div>
-                            <div><label>Month</label><select id="sel-month"></select></div>
                             <div><label>Date</label><input type="date" id="ipt-date"></div>
                             <div><label>Entity</label><select id="sel-place"></select></div>
                             <div><label>Bank</label><select id="sel-bank"><option value="WH MAIN CGD">WH MAIN CGD</option><option value="CAPITAL FUND WH">CAPITAL FUND WH</option></select></div>
@@ -102,53 +98,42 @@
                         <h4>Recent Activity</h4>
                         <div class="table-container">
                             <table>
-                                <thead>
-                                    <tr><th>Date</th><th>Entity</th><th>Bank</th><th>Type</th><th align="right">Total</th></tr>
-                                </thead>
-                                <tbody id="table-recent">
-                                    <!-- Populated by JS -->
-                                </tbody>
+                                <thead><tr><th>Date</th><th>Entity</th><th>Bank</th><th>Type</th><th align="right">Total</th></tr></thead>
+                                <tbody id="table-recent"></tbody>
                             </table>
                         </div>
                     </div>
                 </div>
 
-                <!-- RIGHT COLUMN: MINI TOOLS -->
-                <div>
-                    <div class="box" style="padding: 15px;">
-                        <h4>Manage Entities</h4>
-                        <div style="display: flex; gap: 5px; margin-bottom: 10px;">
-                            <input type="text" id="ipt-new-entity" placeholder="Name..." style="padding: 6px; font-size: 12px; text-transform: uppercase;">
-                            <button class="btn" id="btn-add-entity" style="background: var(--capital); padding: 5px 10px; font-size: 11px;">Add</button>
-                        </div>
-                        <div class="entity-tag-list" id="list-entities">
-                            <!-- Entities list -->
-                        </div>
+                <div class="box">
+                    <h4>Manage Entities</h4>
+                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                        <input type="text" id="ipt-new-entity" placeholder="Name..." style="text-transform: uppercase;">
+                        <button class="btn" id="btn-add-entity" style="background: var(--capital); font-size: 11px;">Add</button>
                     </div>
+                    <div class="entity-tag-list" id="list-entities"></div>
+                    <button id="btn-restore-entities" style="margin-top: 10px; font-size: 10px; background: none; border: 1px solid #ddd; cursor: pointer; color: #999; padding: 5px; border-radius: 4px;">Load Default Entities</button>
                 </div>
-
             </div>
         </div>
 
-        <!-- TAB 2: HISTORY -->
         <div id="tab-history" class="tab-content">
             <div class="box" style="padding:15px">
                 <div class="form-grid">
-                    <div><label>Year</label><select id="hist-f-year"><option value="All">All Years</option></select></div>
-                    <div><label>Month</label><select id="hist-f-month"><option value="All">All Months</option></select></div>
-                    <div><label>Entity</label><select id="hist-f-place"><option value="All">All Entities</option></select></div>
+                    <div><label>Filter Year</label><select id="hist-f-year"><option value="All">All Years</option></select></div>
+                    <div><label>Filter Month</label><select id="hist-f-month"><option value="All">All Months</option></select></div>
+                    <div><label>Filter Entity</label><select id="hist-f-place"><option value="All">All Entities</option></select></div>
                     <button class="btn" id="btn-export-excel" style="background:var(--success)">Export CSV</button>
                 </div>
             </div>
             <div class="table-container box">
-                <table style="min-width: 1000px;">
-                    <thead><tr><th>Year</th><th>Month</th><th>Date</th><th>Entity</th><th>Bank</th><th>Type</th><th>Net</th><th>VAT</th><th>Total</th><th>Action</th></tr></thead>
+                <table>
+                    <thead><tr><th>Year</th><th>Month</th><th>Date (Edit)</th><th>Entity</th><th>Bank</th><th>Type</th><th>Net</th><th>VAT</th><th>Total</th><th>Action</th></tr></thead>
                     <tbody id="table-history-body"></tbody>
                 </table>
             </div>
         </div>
 
-        <!-- TAB 3: DASHBOARD -->
         <div id="tab-dashboard" class="tab-content">
             <div class="dash-results-row" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: center; margin-bottom: 20px;">
                 <div class="box"><h3>INCOME</h3><b id="dash-num-inc" class="income-text" style="font-size:1.5em">0.00 €</b></div>
@@ -178,31 +163,34 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    const years = [];
-    for (let y = 2023; y <= 2035; y++) { years.push(y.toString()); }
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    
+    const yearsArr = [];
+    for (let y = 2023; y <= 2035; y++) yearsArr.push(y.toString());
+
+    const defaultEntities = ["ALVES BANDEIRA", "SALARY", "INTERMARCHE", "LEROY MERLIN", "MODELO", "WORTEN", "PORTAGENS", "STAPLES", "MAKRO", "WAREHOUSE RENT", "SEGUROS", "CENTROFAX", "SOTECNISOL", "CONTINENTE", "AUCHAN", "ALDI", "GRUPEME", "COIMPACK", "CEPSA", "BP", "ACTION", "RADIO POPULAR", "MVM", "EUROGRIP", "100 METROS", "BRICOMARCHE", "LIDL", "IBEROCAR", "MEU SUPER", "CONTROLAUTO", "HIPER EIRAS", "REPSOL", "NORAUTO", "PINGO DOCE", "AUCHAN GASOLINEIRA", "BONUS", "100METROS", "PAUL STRIKER", "OUTROS"];
+
     let entities = [];
     let transactions = [];
     let barChart, pieChart;
 
     window.onload = () => {
-        const sy = document.getElementById('sel-year'); const hfy = document.getElementById('hist-f-year');
-        const sm = document.getElementById('sel-month'); const hfm = document.getElementById('hist-f-month');
-        years.forEach(y => { sy.innerHTML += `<option>${y}</option>`; hfy.innerHTML += `<option>${y}</option>`; });
-        months.forEach(m => { sm.innerHTML += `<option>${m}</option>`; hfm.innerHTML += `<option>${m}</option>`; });
-        sy.value = new Date().getFullYear().toString();
+        const hy = document.getElementById('hist-f-year');
+        const hm = document.getElementById('hist-f-month');
+        yearsArr.forEach(y => hy.innerHTML += `<option>${y}</option>`);
+        months.forEach(m => hm.innerHTML += `<option>${m}</option>`);
         document.getElementById('ipt-date').valueAsDate = new Date();
-        
-        initCharts();
-        loadBalances();
-        listenEntities();
-        listenTransactions();
-        setupTabs();
-        [hfy, hfm, document.getElementById('hist-f-place')].forEach(el => el.addEventListener('change', updateUI));
+        initCharts(); loadBalances(); listenEntities(); listenTransactions(); setupTabs();
+        [hy, hm, document.getElementById('hist-f-place')].forEach(el => el.addEventListener('change', updateUI));
     };
 
-    // --- ENTITIES ---
+    document.getElementById('btn-restore-entities').onclick = async () => {
+        if(confirm("Carregar lista original?")) {
+            for(let name of defaultEntities) {
+                if(!entities.some(e => e.name === name)) await addDoc(collection(db, "entities"), { name });
+            }
+        }
+    };
+
     function listenEntities() {
         onSnapshot(query(collection(db, "entities"), orderBy("name", "asc")), (snapshot) => {
             entities = snapshot.docs.map(doc => ({ id: doc.id, name: doc.data().name }));
@@ -212,24 +200,18 @@
 
     document.getElementById('btn-add-entity').onclick = async () => {
         const name = document.getElementById('ipt-new-entity').value.trim().toUpperCase();
-        if(!name) return;
-        if(entities.some(e => e.name === name)) return alert("Exists");
-        await addDoc(collection(db, "entities"), { name });
+        if(name) await addDoc(collection(db, "entities"), { name });
         document.getElementById('ipt-new-entity').value = "";
     };
 
-    window.deleteEntity = async (id) => {
-        if(confirm("Remove entity from list?")) await deleteDoc(doc(db, "entities", id));
-    };
+    window.deleteEntity = async (id) => { if(confirm("Remover?")) await deleteDoc(doc(db, "entities", id)); };
 
     function updateEntityUI() {
         const sel = document.getElementById('sel-place');
         const filt = document.getElementById('hist-f-place');
         const list = document.getElementById('list-entities');
         const curSel = sel.value;
-        sel.innerHTML = "";
-        filt.innerHTML = '<option value="All">All Entities</option>';
-        list.innerHTML = "";
+        sel.innerHTML = ""; filt.innerHTML = '<option value="All">All Entities</option>'; list.innerHTML = "";
         entities.forEach(ent => {
             sel.innerHTML += `<option value="${ent.name}">${ent.name}</option>`;
             filt.innerHTML += `<option value="${ent.name}">${ent.name}</option>`;
@@ -238,7 +220,6 @@
         sel.value = curSel;
     }
 
-    // --- LOGIC ---
     function autoCalc() {
         const n = parseFloat(document.getElementById('ipt-net').value) || 0;
         const v = parseFloat(document.getElementById('ipt-vat').value) || 0;
@@ -257,13 +238,15 @@
 
     document.getElementById('btn-save-balances').onclick = async () => {
         await setDoc(doc(db, "settings", "balances"), { cgd: parseFloat(document.getElementById('init-cgd').value), cap: parseFloat(document.getElementById('init-cap').value) });
-        alert("Balances Saved!"); updateUI();
+        alert("Saved!"); updateUI();
     };
 
     document.getElementById('btn-register').onclick = async () => {
+        const dateVal = document.getElementById('ipt-date').value;
         const total = parseFloat(document.getElementById('ipt-total').value);
-        if(!total || total <= 0) return alert("Error");
-        const data = { year: document.getElementById('sel-year').value, month: document.getElementById('sel-month').value, date: document.getElementById('ipt-date').value, place: document.getElementById('sel-place').value, bank: document.getElementById('sel-bank').value, type: document.getElementById('sel-type').value, net: parseFloat(document.getElementById('ipt-net').value) || 0, vat: parseFloat(document.getElementById('ipt-vat').value) || 0, total: total, ts: Date.now() };
+        if(!dateVal || total <= 0) return alert("Erro");
+        const dateParts = dateVal.split('-');
+        const data = { year: dateParts[0], month: months[parseInt(dateParts[1]) - 1], date: dateVal, place: document.getElementById('sel-place').value, bank: document.getElementById('sel-bank').value, type: document.getElementById('sel-type').value, net: parseFloat(document.getElementById('ipt-net').value) || 0, vat: parseFloat(document.getElementById('ipt-vat').value) || 0, total, ts: Date.now() };
         await addDoc(collection(db, "transactions"), data);
         document.getElementById('ipt-net').value = ""; document.getElementById('ipt-vat').value = ""; document.getElementById('ipt-total').value = "";
     };
@@ -282,21 +265,24 @@
         const fM = document.getElementById('hist-f-month').value;
         const fP = document.getElementById('hist-f-place').value;
         hBody.innerHTML = ""; rBody.innerHTML = "";
-        
         let cgd = parseFloat(document.getElementById('init-cgd').value) || 0;
         let cap = parseFloat(document.getElementById('init-cap').value) || 0;
 
         transactions.forEach((m, idx) => {
             if(m.bank === "WH MAIN CGD") cgd += (m.type === "Income" ? m.total : -m.total);
             else cap += (m.type === "Income" ? m.total : -m.total);
-            
             if((fY === "All" || m.year === fY) && (fM === "All" || m.month === fM) && (fP === "All" || m.place === fP)) {
-                hBody.innerHTML += `<tr><td class="editable" contenteditable="true" onblur="updateField('${m.id}', 'year', this.innerText)">${m.year}</td><td class="editable" contenteditable="true" onblur="updateField('${m.id}', 'month', this.innerText)">${m.month}</td><td>${m.date}</td><td class="editable" contenteditable="true" onblur="updateField('${m.id}', 'place', this.innerText)">${m.place}</td><td>${m.bank}</td><td>${m.type}</td><td align="right">${m.net.toFixed(2)}</td><td align="right">${m.vat.toFixed(2)}</td><td align="right" class="${m.type==='Income'?'income-text':'expense-text'}">${m.total.toFixed(2)}€</td><td><button class="btn-del" onclick="deleteEntry('${m.id}')">Del</button></td></tr>`;
+                hBody.innerHTML += `<tr>
+                    <td class="editable" contenteditable="true" onblur="updateField('${m.id}', 'year', this.innerText)">${m.year}</td>
+                    <td class="editable" contenteditable="true" onblur="updateField('${m.id}', 'month', this.innerText)">${m.month}</td>
+                    <td class="editable" contenteditable="true" onblur="updateField('${m.id}', 'date', this.innerText)">${m.date}</td>
+                    <td class="editable" contenteditable="true" onblur="updateField('${m.id}', 'place', this.innerText)">${m.place}</td>
+                    <td>${m.bank}</td><td>${m.type}</td>
+                    <td align="right">${m.net.toFixed(2)}</td><td align="right">${m.vat.toFixed(2)}</td>
+                    <td align="right" class="${m.type==='Income'?'income-text':'expense-text'}">${m.total.toFixed(2)}€</td>
+                    <td><button class="btn-del" onclick="deleteEntry('${m.id}')">Del</button></td></tr>`;
             }
-
-            if(idx < 5) {
-                rBody.innerHTML += `<tr><td>${m.date}</td><td>${m.place}</td><td>${m.bank}</td><td>${m.type}</td><td align="right" class="${m.type==='Income'?'income-text':'expense-text'}">${m.total.toFixed(2)}€</td></tr>`;
-            }
+            if(idx < 5) rBody.innerHTML += `<tr><td>${m.date}</td><td>${m.place}</td><td>${m.bank}</td><td>${m.type}</td><td align="right" class="${m.type==='Income'?'income-text':'expense-text'}">${m.total.toFixed(2)}€</td></tr>`;
         });
         document.getElementById('cgd-balance').innerText = cgd.toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
         document.getElementById('cap-balance').innerText = cap.toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
@@ -304,8 +290,23 @@
         refreshDashboard();
     }
 
-    window.updateField = async (id, field, val) => { await updateDoc(doc(db, "transactions", id), { [field]: val }); };
-    window.deleteEntry = async (id) => { if(confirm("Delete?")) await deleteDoc(doc(db, "transactions", id)); };
+    // --- SMART UPDATE FIELD ---
+    window.updateField = async (id, field, val) => {
+        val = val.trim();
+        let updateObj = { [field]: val };
+
+        // Se a data for editada, recalcular Ano e Mês automaticamente
+        if(field === 'date') {
+            const parts = val.split('-');
+            if(parts.length === 3) {
+                updateObj.year = parts[0];
+                updateObj.month = months[parseInt(parts[1]) - 1];
+            }
+        }
+        await updateDoc(doc(db, "transactions", id), updateObj);
+    };
+
+    window.deleteEntry = async (id) => { if(confirm("Apagar?")) await deleteDoc(doc(db, "transactions", id)); };
 
     document.getElementById('btn-export-excel').onclick = () => {
         const headers = ["Year", "Month", "Date", "Entity", "Bank", "Type", "Net", "VAT", "Total"];
@@ -313,7 +314,7 @@
         transactions.forEach(m => { csv += [m.year, m.month, m.date, `"${m.place}"`, m.bank, m.type, m.net.toString().replace(".", ","), m.vat.toString().replace(".", ","), m.total.toString().replace(".", ",")].join(";") + "\n"; });
         const link = document.createElement("a");
         link.setAttribute("href", URL.createObjectURL(new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' })));
-        link.setAttribute("download", `Report.csv`);
+        link.setAttribute("download", `Finance_Report.csv`);
         link.click();
     };
 
