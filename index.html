@@ -9,9 +9,26 @@
         :root { --primary: #2c3e50; --cgd: #0056b3; --capital: #8e44ad; --success: #27ae60; --danger: #e74c3c; --bg: #f8f9fa; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; color: #333; }
         
-        .nav-tabs { background: var(--primary); display: flex; padding: 0 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        /* TELA DE LOGIN */
+        #login-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: var(--primary); display: flex; justify-content: center; align-items: center;
+            z-index: 10000; color: white;
+        }
+        .login-box {
+            background: white; padding: 40px; border-radius: 12px;
+            width: 100%; max-width: 350px; color: #333; text-align: center;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .login-box h2 { margin-top: 0; color: var(--primary); }
+        .login-box input { margin-bottom: 15px; width: 100%; box-sizing: border-box; }
+        .hidden { display: none !important; }
+
+        .nav-tabs { background: var(--primary); display: flex; padding: 0 20px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 10px rgba(0,0,0,0.2); align-items: center; }
         .tab-btn { background: none; border: none; color: #bdc3c7; padding: 15px 25px; cursor: pointer; font-weight: bold; text-transform: uppercase; transition: 0.3s; border-bottom: 3px solid transparent; }
         .tab-btn.active { color: white; border-bottom: 3px solid var(--success); }
+        
+        #btn-logout { background: #c0392b; margin-left: auto; font-size: 11px; padding: 8px 15px; }
 
         .container { max-width: 1550px; margin: 30px auto; padding: 0 20px; }
         .tab-content { display: none; animation: fadeIn 0.4s ease; }
@@ -48,10 +65,25 @@
         .entity-tag-list { max-height: 250px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; border: 1px solid #eee; padding: 5px; border-radius: 5px; }
         .entity-item { display: flex; justify-content: space-between; align-items: center; background: #fdfdfd; padding: 4px 8px; border-bottom: 1px solid #eee; font-size: 0.75em; }
 
-        #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:9999; display:flex; justify-content:center; align-items:center; }
+        #loader { position: fixed; top:0; left:0; width:100%; height:100%; background:white; z-index:9998; display:flex; justify-content:center; align-items:center; }
     </style>
 </head>
 <body>
+
+    <!-- OVERLAY DE LOGIN -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2>WH Cloud Login</h2>
+            <div style="text-align: left;">
+                <label>E-mail</label>
+                <input type="email" id="login-email" placeholder="ex: admin@wh.com">
+                <label>Password</label>
+                <input type="password" id="login-pass" placeholder="******">
+            </div>
+            <button class="btn btn-add" id="btn-do-login" style="width: 100%; margin-top: 10px;">Entrar</button>
+            <p id="login-error" style="color:red; font-size:12px; margin-top:15px; font-weight: bold;"></p>
+        </div>
+    </div>
 
     <div id="loader"><h2>Syncing WH Cloud...</h2></div>
 
@@ -59,10 +91,11 @@
         <button class="tab-btn active" data-tab="tab-entry">Entry & Balances</button>
         <button class="tab-btn" data-tab="tab-history">Transactions History</button>
         <button class="tab-btn" data-tab="tab-dashboard">Visual Dashboard</button>
+        <button id="btn-logout" class="btn">Sair</button>
     </nav>
 
     <div class="container">
-        <!-- GLOBAL BALANCES (DYNAMICS) -->
+        <!-- GLOBAL BALANCES -->
         <div class="top-summary">
             <div class="card" style="border-left-color: var(--cgd)">
                 <h3>WH MAIN CGD <span class="filter-label" id="lab-filt-cgd">(Filtered)</span></h3>
@@ -78,6 +111,7 @@
             </div>
         </div>
 
+        <!-- TAB ENTRY -->
         <div id="tab-entry" class="tab-content active">
             <div style="display: grid; grid-template-columns: 3fr 1fr; gap: 20px; align-items: start;">
                 <div>
@@ -127,6 +161,7 @@
             </div>
         </div>
 
+        <!-- TAB HISTORY -->
         <div id="tab-history" class="tab-content">
             <div class="box" style="padding:15px">
                 <div class="form-grid">
@@ -144,6 +179,7 @@
             </div>
         </div>
 
+        <!-- TAB DASHBOARD -->
         <div id="tab-dashboard" class="tab-content">
             <div class="box" style="padding:15px; margin-bottom: 20px;">
                 <div class="form-grid" style="grid-template-columns: 1fr 1fr auto;">
@@ -167,6 +203,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
     import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, deleteDoc, doc, setDoc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
     const firebaseConfig = {
         apiKey: "AIzaSyAR7IwVllLB8NSzWHOEDzEpn1DZV1OzcKQ",
@@ -179,6 +216,7 @@
 
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
+    const auth = getAuth(app);
 
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const yearsArr = [];
@@ -191,11 +229,41 @@
     let barChart, pieChart;
     let currentTab = 'tab-entry';
 
-    window.onload = () => {
+    // LÓGICA DE AUTENTICAÇÃO
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            document.getElementById('login-overlay').classList.add('hidden');
+            initApp(); 
+        } else {
+            document.getElementById('login-overlay').classList.remove('hidden');
+            document.getElementById('loader').style.display = 'none';
+        }
+    });
+
+    document.getElementById('btn-do-login').onclick = async () => {
+        const email = document.getElementById('login-email').value;
+        const pass = document.getElementById('login-pass').value;
+        const err = document.getElementById('login-error');
+        try {
+            await signInWithEmailAndPassword(auth, email, pass);
+        } catch (e) {
+            err.innerText = "Error: " + e.message;
+        }
+    };
+
+    document.getElementById('btn-logout').onclick = () => signOut(auth).then(() => window.location.reload());
+
+    // INICIALIZAÇÃO DO SISTEMA PÓS-LOGIN
+    function initApp() {
         const hy = document.getElementById('hist-f-year');
         const hm = document.getElementById('hist-f-month');
         const dy = document.getElementById('dash-f-year');
         const dm = document.getElementById('dash-f-month');
+
+        hy.innerHTML = '<option value="All">All Years</option>';
+        dy.innerHTML = '<option value="All">All Years</option>';
+        hm.innerHTML = '<option value="All">All Months</option>';
+        dm.innerHTML = '<option value="All">All Months</option>';
 
         yearsArr.forEach(y => { hy.innerHTML += `<option value="${y}">${y}</option>`; dy.innerHTML += `<option value="${y}">${y}</option>`; });
         months.forEach(m => { hm.innerHTML += `<option value="${m}">${m}</option>`; dm.innerHTML += `<option value="${m}">${m}</option>`; });
@@ -204,7 +272,7 @@
         initCharts(); loadBalances(); listenEntities(); listenTransactions(); setupTabs();
         [hy, hm, document.getElementById('hist-f-place')].forEach(el => el.addEventListener('change', updateUI));
         [dy, dm].forEach(el => el.addEventListener('change', refreshDashboard));
-    };
+    }
 
     document.getElementById('btn-restore-entities').onclick = async () => {
         if(confirm("Load default list?")) {
@@ -281,46 +349,25 @@
         });
     }
 
-    // --- FUNÇÃO CENTRAL DE ATUALIZAÇÃO DA UI ---
     function updateUI() {
         const hBody = document.getElementById('table-history-body');
         const rBody = document.getElementById('table-recent');
-        
-        // Filtros Atuais (Tab History)
         const fY = document.getElementById('hist-f-year').value;
         const fM = document.getElementById('hist-f-month').value;
         const fP = document.getElementById('hist-f-place').value;
         const isFiltered = (fY !== "All" || fM !== "All" || fP !== "All");
 
         hBody.innerHTML = ""; rBody.innerHTML = "";
-        
-        // Acumuladores Globais (Saldo Real)
         let globalCgd = parseFloat(document.getElementById('init-cgd').value) || 0;
         let globalCap = parseFloat(document.getElementById('init-cap').value) || 0;
+        let filtCgd = 0, filtCap = 0;
 
-        // Acumuladores Filtrados (Visíveis na Tabela)
-        let filtCgd = 0;
-        let filtCap = 0;
-
-        // Processar Transações
         transactions.forEach((m, idx) => {
             const moveVal = (m.type === "Income" ? m.total : -m.total);
-            
-            // Sempre somar ao Global
-            if(m.bank === "WH MAIN CGD") globalCgd += moveVal;
-            else globalCap += moveVal;
+            if(m.bank === "WH MAIN CGD") globalCgd += moveVal; else globalCap += moveVal;
 
-            // Verificar se passa no filtro
-            const matchY = (fY === "All" || m.year === fY);
-            const matchM = (fM === "All" || m.month === fM);
-            const matchP = (fP === "All" || m.place === fP);
-
-            if(matchY && matchM && matchP) {
-                // Se passar no filtro, somar ao acumulador de "vista"
-                if(m.bank === "WH MAIN CGD") filtCgd += moveVal;
-                else filtCap += moveVal;
-
-                // Adicionar à tabela de histórico
+            if((fY === "All" || m.year === fY) && (fM === "All" || m.month === fM) && (fP === "All" || m.place === fP)) {
+                if(m.bank === "WH MAIN CGD") filtCgd += moveVal; else filtCap += moveVal;
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="editable" contenteditable="true" onblur="updateField('${m.id}', 'year', this.innerText)">${m.year}</td>
@@ -333,48 +380,28 @@
                     <td><button class="btn-del" onclick="deleteEntry('${m.id}')">Del</button></td>`;
                 hBody.appendChild(tr);
             }
-
-            // Recent Activity (sempre os últimos 5 inseridos)
-            if(idx < 5) {
-                rBody.innerHTML += `<tr><td>${m.date}</td><td>${m.place}</td><td>${m.bank}</td><td>${m.type}</td><td align="right" class="${m.type==='Income'?'income-text':'expense-text'}">${m.total.toFixed(2)}€</td></tr>`;
-            }
+            if(idx < 5) rBody.innerHTML += `<tr><td>${m.date}</td><td>${m.place}</td><td>${m.bank}</td><td>${m.type}</td><td align="right" class="${m.type==='Income'?'income-text':'expense-text'}">${m.total.toFixed(2)}€</td></tr>`;
         });
 
-        // --- LÓGICA DE EXIBIÇÃO NOS CARTÕES DO TOPO ---
-        // Se estivermos no separador de Histórico e houver filtros ativos, mostramos apenas a soma dos filtros
         if(currentTab === 'tab-history' && isFiltered) {
             document.getElementById('cgd-balance').innerText = filtCgd.toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
             document.getElementById('cap-balance').innerText = filtCap.toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
             document.getElementById('grand-total').innerText = (filtCgd + filtCap).toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
-            
-            // Mostrar etiquetas de "(Filtered)"
-            document.getElementById('lab-filt-cgd').style.display = 'inline';
-            document.getElementById('lab-filt-cap').style.display = 'inline';
-            document.getElementById('lab-filt-total').style.display = 'inline';
+            document.querySelectorAll('.filter-label').forEach(el => el.style.display = 'inline');
         } else {
-            // Caso contrário (ou se for "All"), mostrar o saldo real absoluto
             document.getElementById('cgd-balance').innerText = globalCgd.toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
             document.getElementById('cap-balance').innerText = globalCap.toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
             document.getElementById('grand-total').innerText = (globalCgd + globalCap).toLocaleString('pt-PT', {style:'currency',currency:'EUR'});
-            
-            // Esconder etiquetas de "(Filtered)"
-            document.getElementById('lab-filt-cgd').style.display = 'none';
-            document.getElementById('lab-filt-cap').style.display = 'none';
-            document.getElementById('lab-filt-total').style.display = 'none';
+            document.querySelectorAll('.filter-label').forEach(el => el.style.display = 'none');
         }
-
         refreshDashboard();
     }
 
     window.updateField = async (id, field, val) => {
-        val = val.trim();
-        let updateObj = { [field]: val };
+        let updateObj = { [field]: val.trim() };
         if(field === 'date') {
-            const parts = val.split('-');
-            if(parts.length === 3) {
-                updateObj.year = parts[0];
-                updateObj.month = months[parseInt(parts[1]) - 1];
-            }
+            const parts = val.trim().split('-');
+            if(parts.length === 3) { updateObj.year = parts[0]; updateObj.month = months[parseInt(parts[1]) - 1]; }
         }
         await updateDoc(doc(db, "transactions", id), updateObj);
     };
@@ -384,8 +411,7 @@
     document.getElementById('btn-export-excel').onclick = () => {
         const headers = ["Year", "Month", "Date", "Entity", "Bank", "Type", "Net", "VAT", "Total"];
         let csv = headers.join(";") + "\n";
-        const exportSorted = [...transactions].sort((a,b) => a.date.localeCompare(b.date));
-        exportSorted.forEach(m => { csv += [m.year, m.month, m.date, `"${m.place}"`, m.bank, m.type, m.net.toString().replace(".", ","), m.vat.toString().replace(".", ","), m.total.toString().replace(".", ",")].join(";") + "\n"; });
+        [...transactions].sort((a,b) => a.date.localeCompare(b.date)).forEach(m => { csv += [m.year, m.month, m.date, `"${m.place}"`, m.bank, m.type, m.net.toString().replace(".", ","), m.vat.toString().replace(".", ","), m.total.toString().replace(".", ",")].join(";") + "\n"; });
         const link = document.createElement("a");
         link.setAttribute("href", URL.createObjectURL(new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' })));
         link.setAttribute("download", `Finance_Report.csv`);
@@ -413,17 +439,22 @@
         document.getElementById('dash-num-net').innerText = net.toLocaleString('pt-PT') + " €";
         document.getElementById('dash-num-net').style.color = net >= 0 ? 'var(--success)' : 'var(--danger)';
 
-        barChart.data.datasets[0].data = months.map(m => mData[m].inc);
-        barChart.data.datasets[1].data = months.map(m => mData[m].exp);
-        barChart.update();
-
-        const sorted = Object.entries(eData).sort((a,b) => b[1] - a[1]).slice(0, 5);
-        pieChart.data.labels = sorted.map(e => e[0]); 
-        pieChart.data.datasets[0].data = sorted.map(e => e[1]); 
-        pieChart.update();
+        if(barChart) {
+            barChart.data.datasets[0].data = months.map(m => mData[m].inc);
+            barChart.data.datasets[1].data = months.map(m => mData[m].exp);
+            barChart.update();
+        }
+        if(pieChart) {
+            const sorted = Object.entries(eData).sort((a,b) => b[1] - a[1]).slice(0, 5);
+            pieChart.data.labels = sorted.map(e => e[0]); 
+            pieChart.data.datasets[0].data = sorted.map(e => e[1]); 
+            pieChart.update();
+        }
     }
 
     function initCharts() {
+        if(barChart) barChart.destroy();
+        if(pieChart) pieChart.destroy();
         barChart = new Chart(document.getElementById('barChart').getContext('2d'), { type: 'bar', data: { labels: months, datasets: [{ label: 'Income', backgroundColor: '#27ae60', data: [] }, { label: 'Expense', backgroundColor: '#e74c3c', data: [] }] }, options: { responsive: true, maintainAspectRatio: false } });
         pieChart = new Chart(document.getElementById('pieChart').getContext('2d'), { type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: ['#3498db','#9b59b6','#f1c40f','#e67e22','#1abc9c'] }] }, options: { responsive: true, maintainAspectRatio: false } });
     }
@@ -433,9 +464,9 @@
             btn.onclick = (e) => {
                 document.querySelectorAll('.tab-btn, .tab-content').forEach(el => el.classList.remove('active'));
                 e.target.classList.add('active');
-                currentTab = e.target.dataset.tab; // Guardar o separador atual
+                currentTab = e.target.dataset.tab;
                 document.getElementById(currentTab).classList.add('active');
-                updateUI(); // Forçar atualização para refletir somas do separador
+                updateUI();
                 if(currentTab === 'tab-dashboard') { barChart.resize(); pieChart.resize(); }
             }
         });
